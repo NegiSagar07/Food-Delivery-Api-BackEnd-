@@ -1,0 +1,37 @@
+# --- Python ---
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Virtual Environment ---
+# The entire environment folder
+venv/
+.venv/
+env/
+.env/
+
+# --- Environment Variables ---
+# *** THIS IS THE MOST IMPORTANT LINE ***
+# Never commit your secrets (API keys, DB passwords)
+.env
+.env.*
+
+# --- Local Database ---
+# Ignore local database files (like our development 'food.db')
+*.sqlite
+*.sqlite3
+food.db
+
+# --- IDE / Editor ---
+# VSCode
+.vscode/
+# PyCharm
+.idea/
+
+# --- Operating System ---
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
