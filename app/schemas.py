@@ -26,6 +26,7 @@ class RestaurantCreate(RestaurantBase):
 
 class RestaurantRead(RestaurantBase):
     id: int
+    owner: UserRead
 
 
 class FoodBase(SQLModel):

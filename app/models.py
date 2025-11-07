@@ -10,6 +10,9 @@ class RestaurantFoodLink(SQLModel, table=True):
     price: float
     food_rating: Optional[float] = Field(default=None)
 
+    owner_id: int = Field(foreign_key="users.id")
+    owner: "User" = Relationship(back_populates="restaurants")
+
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -20,6 +23,7 @@ class User(SQLModel, table=True):
     hashed_password: str
 
     orders: List["Order"] = Relationship(back_populates="user")
+    restaurants: List["Restaurant"] = Relationship(back_populates="owner")
 
 
 class Restaurant(SQLModel, table=True):
