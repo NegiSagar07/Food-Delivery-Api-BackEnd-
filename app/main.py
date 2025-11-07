@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from .router import auth
+from .routers import auth, users
 from sqlmodel import SQLModel
 from contextlib import asynccontextmanager
 from .database import engine
@@ -25,6 +25,7 @@ app = FastAPI(
 
 
 app.include_router(auth.router)
+app.include_router(users.router)
 
 
 @app.get("/")

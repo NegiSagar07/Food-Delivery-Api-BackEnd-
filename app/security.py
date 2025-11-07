@@ -1,8 +1,9 @@
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, VerifyMismatchError
+from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
-from sqlmodel import Session, select
+from sqlmodel import select
 from .models import User
 from .config import settings
 from typing import Optional
@@ -41,7 +42,7 @@ def create_access_token(data: dict, expire_delta: Optional[timedelta] = None):
     return token
 
 
-def get_user_from_token(token: str, session: Session):
+async def get_user_from_token(token: str, session: AsyncSession):
     # decode the token
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -49,7 +50,9 @@ def get_user_from_token(token: str, session: Session):
         if email is None:
             return None
         
-        user = session.exec(select(User).where(User.email == email)).first()
-        return user
+        query = select(User).where(User.email == email)
+        user = await session.execute(query)
+        return user.scalars().first()
+    
     except JWTError:
         return None
