@@ -2,7 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
 
 
-class RestaurantFoodLink(SQLModel):
+class RestaurantFoodLink(SQLModel, table=True):
     __tablename__ = "restaurant_food_links"
 
     restaurant_id: int = Field(foreign_key="restaurants.id", primary_key=True)
@@ -11,7 +11,7 @@ class RestaurantFoodLink(SQLModel):
     food_rating: Optional[float] = Field(default=None)
 
 
-class User(SQLModel):
+class User(SQLModel, table=True):
     __tablename__ = "users"
 
     id: Optional[int] = Field(default= None, primary_key=True)
@@ -22,7 +22,7 @@ class User(SQLModel):
     orders: List["Order"] = Relationship(back_populates="user")
 
 
-class Restaurant(SQLModel):
+class Restaurant(SQLModel, table=True):
     __tablename__ = "restaurants"
 
     id: Optional[int] = Field(default= None, primary_key=True)
@@ -33,7 +33,7 @@ class Restaurant(SQLModel):
     orders: List["Order"] = Relationship(back_populates="restaurant")
 
 
-class Food(SQLModel):
+class Food(SQLModel, table=True):
     __tablename__ = "foods"
 
     id: Optional[int] = Field(default= None, primary_key=True)
@@ -44,7 +44,7 @@ class Food(SQLModel):
     order_items: List["OrderItem"] = Relationship(back_populates="food")
 
 
-class Order(SQLModel):
+class Order(SQLModel, table=True):
     __tablename__= "orders"
 
     id: Optional[int] = Field(default= None, primary_key=True)
@@ -57,7 +57,7 @@ class Order(SQLModel):
     items: List["OrderItem"] = Relationship(back_populates="order")
 
 
-class OrderItem(SQLModel):
+class OrderItem(SQLModel, table=True):
     __tablename__ = "order_items"
 
     id: Optional[int] = Field(default= None, primary_key=True)

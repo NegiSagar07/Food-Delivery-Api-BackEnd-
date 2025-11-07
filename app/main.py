@@ -1,7 +1,32 @@
 from fastapi import FastAPI
+from .router import auth
+from sqlmodel import SQLModel
+from contextlib import asynccontextmanager
+from .database import engine
+from . import models
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Application starting up")
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    print("database table created")
+    yield
+    print("application shutting down")
+
+
+app = FastAPI(
+    title="Food Delivery App",
+    description="This is the api for food delivery app.",
+    version="1.0",
+    lifespan=lifespan
+)
+
+
+app.include_router(auth.router)
+
 
 @app.get("/")
 async def root():
-    return {"msg" : "Food Delivery Api"}
+    return {"msg" : "Welcome to the Food Delivery Api"}
