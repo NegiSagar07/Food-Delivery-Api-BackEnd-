@@ -10,9 +10,6 @@ class RestaurantFoodLink(SQLModel, table=True):
     price: float
     food_rating: Optional[float] = Field(default=None)
 
-    owner_id: int = Field(foreign_key="users.id")
-    owner: "User" = Relationship(back_populates="restaurants")
-
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -23,15 +20,18 @@ class User(SQLModel, table=True):
     hashed_password: str
 
     orders: List["Order"] = Relationship(back_populates="user")
-    restaurants: List["Restaurant"] = Relationship(back_populates="owner")
+    restaurants: List["Restaurant"] = Relationship(back_populates="owner", sa_relationship_kwargs={"lazy": "selectin"})
 
 
 class Restaurant(SQLModel, table=True):
     __tablename__ = "restaurants"
 
     id: Optional[int] = Field(default= None, primary_key=True)
-    name: str
+    name: str = Field(index=True, unique=True)
     rating: Optional[float] = Field(default= None)
+
+    owner_id: int = Field(foreign_key="users.id")
+    owner: "User" = Relationship(back_populates="restaurants", sa_relationship_kwargs={"lazy": "joined"})
 
     foods: List["Food"] = Relationship(back_populates="restaurants", link_model=RestaurantFoodLink)
     orders: List["Order"] = Relationship(back_populates="restaurant")
