@@ -61,9 +61,9 @@ class Order(SQLModel, table=True):
     restaurant_id: int = Field(foreign_key="restaurants.id")
     total_price: float
 
-    user : "User" = Relationship(back_populates="orders")
-    restaurant: "Restaurant" = Relationship(back_populates="orders")
-    items: List["OrderItem"] = Relationship(back_populates="order")
+    user : "User" = Relationship(back_populates="orders", sa_relationship_kwargs={"lazy": "joined"})
+    restaurant: "Restaurant" = Relationship(back_populates="orders", sa_relationship_kwargs={"lazy" : "joined"})
+    items: List["OrderItem"] = Relationship(back_populates="order", sa_relationship_kwargs={"lazy": "selectin"})
 
 
 class OrderItem(SQLModel, table=True):
@@ -75,5 +75,5 @@ class OrderItem(SQLModel, table=True):
     order_id: int = Field(foreign_key="orders.id")
     food_id: int = Field(foreign_key="foods.id")
 
-    food : "Food" = Relationship(back_populates="order_items")
+    food : "Food" = Relationship(back_populates="order_items", sa_relationship_kwargs={"lazy": "joined"})
     order: "Order" = Relationship(back_populates="items")

@@ -73,14 +73,14 @@ class OrderItemRead(SQLModel):
 
 class OrderCreate(SQLModel):
     restaurant_id: int
-    order_items: List[OrderItemCreate]
+    items: List[OrderItemCreate]
     
 
 class OrderRead(SQLModel):
     id: int
     user: UserRead
     restaurant: RestaurantRead
-    order_items: List[OrderItemRead]
+    items: List[OrderItemRead]
     total_price: float
 
 
