@@ -10,6 +10,9 @@ class RestaurantFoodLink(SQLModel, table=True):
     price: float
     food_rating: Optional[float] = Field(default=None)
 
+    food: "Food" = Relationship(back_populates="food_links", sa_relationship_kwargs={"lazy": "joined"})
+    restaurant: "Restaurant" = Relationship(back_populates="restaurant_links", sa_relationship_kwargs={"lazy": "joined"})
+
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -35,17 +38,19 @@ class Restaurant(SQLModel, table=True):
 
     foods: List["Food"] = Relationship(back_populates="restaurants", link_model=RestaurantFoodLink)
     orders: List["Order"] = Relationship(back_populates="restaurant")
+    restaurant_links: List["RestaurantFoodLink"] = Relationship(back_populates="restaurant")
 
 
 class Food(SQLModel, table=True):
     __tablename__ = "foods"
 
     id: Optional[int] = Field(default= None, primary_key=True)
-    name: str
+    name: str = Field(unique=True, index=True)
     description: Optional[str] = Field(default=None)
 
     restaurants: List["Restaurant"] = Relationship(back_populates="foods", link_model=RestaurantFoodLink)
     order_items: List["OrderItem"] = Relationship(back_populates="food")
+    food_links: List[RestaurantFoodLink] = Relationship(back_populates="food")
 
 
 class Order(SQLModel, table=True):

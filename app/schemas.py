@@ -42,6 +42,23 @@ class FoodRead(FoodBase):
     id: int
 
 
+# ----------------------------------------------
+# Menu Link Schemas (NEW)
+# ----------------------------------------------
+
+class MenuLinkCreate(SQLModel):
+    food_id: int
+    price: float
+
+
+class MenuLinkRead(SQLModel):
+    restaurant_id: int
+    food_id: int
+    price: float
+    food_rating: Optional[float]
+    food: FoodRead
+
+
 class OrderItemCreate(SQLModel):
     food_id: int
     quantity: int
