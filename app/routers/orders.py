@@ -4,7 +4,8 @@ from ..dependencies import get_current_user
 from ..database import get_db
 from ..schemas import OrderCreate, OrderRead
 from ..models import User, OrderItem, Order
-from ..crud import get_restaurant_by_id, get_menu_item
+from ..crud import get_restaurant_by_id, get_menu_item, get_order_by_user, get_order_by_id
+from typing import List
 
 
 router = APIRouter(prefix="/order", tags=["Order"])
@@ -60,3 +61,26 @@ async def create_new_order(order_in: OrderCreate, current_user: User = Depends(g
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while creating the order: {e}"
         )
+    
+
+@router.get("/", response_model=List[OrderRead])
+async def get_my_orders(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    orders = await get_order_by_user(user_id=current_user.id, db=db)
+
+    if not orders:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="you didn't have placed any order yet")
+    
+    return orders
+
+
+@router.get("/{order_id}", response_model=OrderRead)
+async def get_sepecif_order(order_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+
+    order = await get_order_by_id(order_id= order_id, db=db)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
+    
+    if order.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="you are not authorized to view this order")
+    
+    return order

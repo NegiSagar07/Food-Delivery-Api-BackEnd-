@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..dependencies import get_current_user
 from ..models import User   
 from ..database import get_db
-from ..crud import get_restaurant_by_name, create_restaurant, get_restaurant_by_id, get_food_by_id, get_menu_item, add_item_to_menu
+from typing import List
+from ..crud import get_restaurant_by_name, create_restaurant, get_restaurant_by_id, get_food_by_id, get_menu_item, add_item_to_menu, get_restaurant, get_restaurant_menu
 
 
 router = APIRouter(prefix="/restaurant", tags=["Restaurant"])
@@ -52,3 +53,31 @@ async def add_menu_item_to_restaurant(restaurant_id: int, menu_item: MenuLinkCre
     )
 
     return new_menu_item
+
+
+@router.get("/", response_model=List[RestaurantRead])
+async def get_all_restaurant(skip: int = 0, limit:int = 100, db: AsyncSession = Depends(get_db)):
+    restaurants = await get_restaurant(db=db, skip=skip, limit=limit)
+    if not restaurants:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no restaurant available")
+    
+    return restaurants
+
+
+@router.get("/{restaurant_id}/menu", response_model=List[MenuLinkRead])
+async def get_menu_of_restaurant(restaurant_id: int, db: AsyncSession = Depends(get_db)):
+    
+    restaurant = await get_restaurant_by_id(id=restaurant_id, db=db)
+    if not restaurant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found."
+        )
+    
+    menu = await get_restaurant_menu(restaurant_id=restaurant_id, db=db)
+    if not menu:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="menu is not found for this restaurant")
+    
+    return menu
+
+

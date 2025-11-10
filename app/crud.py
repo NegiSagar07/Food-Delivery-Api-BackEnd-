@@ -1,8 +1,8 @@
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from .models import User, Restaurant, Food, RestaurantFoodLink
+from .models import User, Restaurant, Food, RestaurantFoodLink, Order
 from sqlmodel import select
-from typing import Optional
+from typing import Optional, List
 
 
 # ------User Crud------
@@ -41,6 +41,18 @@ async def create_restaurant(name: str, rating: Optional[float], owner_id: int, d
     await db.refresh(new_restaurant)
 
     return new_restaurant
+
+
+async def get_restaurant(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[Restaurant]:
+    query = select(Restaurant).offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_restaurant_menu(restaurant_id: int, db: AsyncSession) -> List[RestaurantFoodLink]:
+    query = select(RestaurantFoodLink).where(RestaurantFoodLink.restaurant_id == restaurant_id)
+    result = await db.execute(query)
+    return result.scalars().all()
 
 
 # ------Food Crud------
@@ -92,4 +104,18 @@ async def get_menu_item(restaurant_id: int, food_id, db: AsyncSession) -> Option
     query = select(RestaurantFoodLink).where(RestaurantFoodLink.restaurant_id == restaurant_id, RestaurantFoodLink.food_id == food_id)
     result = await db.execute(query)
 
+    return result.scalars().one_or_none()
+
+
+#------ Order Crud ------
+
+async def get_order_by_user(user_id: int, db: AsyncSession) -> List[Order]:
+    query = select(Order).where(Order.user_id == user_id).order_by(Order.id.desc())
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_order_by_id(order_id: int, db: AsyncSession) -> Order:
+    query = select(Order).where(Order.id == order_id)
+    result = await db.execute(query)
     return result.scalars().one_or_none()
