@@ -59,6 +59,16 @@ class MenuLinkRead(SQLModel):
     food: FoodRead
 
 
+class MenuLinkUpdate(SQLModel):
+    price : Optional[float] = None
+    rating: Optional[float] = None
+
+
+# ----------------------------------------------
+#  Order Schemas (NEW)
+# ----------------------------------------------
+
+
 class OrderItemCreate(SQLModel):
     food_id: int
     quantity: int
