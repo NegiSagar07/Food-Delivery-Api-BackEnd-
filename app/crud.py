@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .models import User, Restaurant, Food, RestaurantFoodLink, Order
 from sqlmodel import select
 from typing import Optional, List
-from .schemas import MenuLinkUpdate
+
 
 # ------User Crud------
 
@@ -15,11 +15,11 @@ async def get_user_by_email(email: str, db: AsyncSession) -> Optional[User]:
 
 # ------Restaurant Crud------
 
-async def get_restaurant_by_id(restaurant_id: int, db: AsyncSession) -> Optional[Restaurant]:
+async def get_restaurant_by_id(id: int, db: AsyncSession) -> Optional[Restaurant]:
     """
     Fetch a single restaurant by its ID.
     """
-    query = select(Restaurant).where(Restaurant.id == restaurant_id)
+    query = select(Restaurant).where(Restaurant.id == id)
     result = await db.execute(query)
     return result.scalars().one_or_none()
 
@@ -107,13 +107,6 @@ async def get_menu_item(restaurant_id: int, food_id, db: AsyncSession) -> Option
     return result.scalars().one_or_none()
 
 
-async def delete_menu_item(db_menu_item: RestaurantFoodLink, db: AsyncSession):
-    await db.delete(db_menu_item)
-    await db.commit()
-
-    return 
-
-
 #------ Order Crud ------
 
 async def get_order_by_user(user_id: int, db: AsyncSession) -> List[Order]:
@@ -126,15 +119,3 @@ async def get_order_by_id(order_id: int, db: AsyncSession) -> Order:
     query = select(Order).where(Order.id == order_id)
     result = await db.execute(query)
     return result.scalars().one_or_none()
-
-
-# ------ Update Menu Item ------
-
-async def update_menu_item(db_menu_item: RestaurantFoodLink, item_update: MenuLinkUpdate, db: AsyncSession) -> RestaurantFoodLink:
-    update_data = item_update.model_dump(exclude_unset=True)
-    db_menu_item.sqlmodel_update(update_data)
-
-    db.add(db_menu_item)
-    await db.commit()
-    await db.refresh(db_menu_item)
-    return db_menu_item

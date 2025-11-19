@@ -1,11 +1,11 @@
-from fastapi import APIRouter, status, Depends, HTTPException, Response
-from ..schemas import RestaurantRead, RestaurantCreate, MenuLinkCreate, MenuLinkRead, MenuLinkUpdate
+from fastapi import APIRouter, status, Depends, HTTPException
+from ..schemas import RestaurantRead, RestaurantCreate, MenuLinkCreate, MenuLinkRead
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..dependencies import get_current_user
 from ..models import User   
 from ..database import get_db
 from typing import List
-from ..crud import get_restaurant_by_name, create_restaurant, get_restaurant_by_id, get_food_by_id, get_menu_item, add_item_to_menu, get_restaurant, get_restaurant_menu, update_menu_item, delete_menu_item
+from ..crud import get_restaurant_by_name, create_restaurant, get_restaurant_by_id, get_food_by_id, get_menu_item, add_item_to_menu, get_restaurant, get_restaurant_menu
 
 
 router = APIRouter(prefix="/restaurant", tags=["Restaurant"])
@@ -67,7 +67,7 @@ async def get_all_restaurant(skip: int = 0, limit:int = 100, db: AsyncSession = 
 @router.get("/{restaurant_id}/menu", response_model=List[MenuLinkRead])
 async def get_menu_of_restaurant(restaurant_id: int, db: AsyncSession = Depends(get_db)):
     
-    restaurant = await get_restaurant_by_id(restaurant_id==restaurant_id, db=db)
+    restaurant = await get_restaurant_by_id(id=restaurant_id, db=db)
     if not restaurant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -81,52 +81,3 @@ async def get_menu_of_restaurant(restaurant_id: int, db: AsyncSession = Depends(
     return menu
 
 
-@router.patch("/{restaurant_id}/menu/{food_id}", response_model=MenuLinkRead)
-async def update_menu_item_details(restaurant_id: int, food_id: int, item_update: MenuLinkUpdate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-
-    restaurant = await get_restaurant_by_id(restaurant_id=restaurant_id, db=db)
-    if not restaurant:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="restaurant not found")
-    
-    if restaurant.owner_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not authorized to update this restaurant's menu")
-    
-    menu_item = await get_menu_item(restaurant_id=restaurant_id, food_id=food_id, db=db)
-    if not menu_item:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="this item is not in the menu")
-    
-    update_item = await update_menu_item(db_menu_item=menu_item, item_update=item_update, db=db)
-
-    return update_item
-
-
-@router.delete("/{restaurant_id}/menu/{food_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_menu_item_from_restaurant(restaurant_id: int, food_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    restaurant = await get_restaurant_by_id(restaurant_id=restaurant_id, db=db)
-    if not restaurant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Restaurant not found."
-        )
-    
-    # 2. **AUTHORIZATION CHECK**
-    if restaurant.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to delete from this restaurant's menu."
-        )
-    
-    # 3. Get the specific menu item
-    menu_item = await get_menu_item(
-        restaurant_id=restaurant_id,
-        food_id=food_id,
-        db=db
-    )
-    if not menu_item:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Food item not found on this menu."
-        )
-    
-    await delete_menu_item(db_menu_item=menu_item, db=db)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)

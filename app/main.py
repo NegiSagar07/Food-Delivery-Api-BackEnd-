@@ -2,17 +2,13 @@ from fastapi import FastAPI
 from .routers import auth, users, restaurants, foods, orders
 from sqlmodel import SQLModel
 from contextlib import asynccontextmanager
-from .database import engine
 from . import models
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Application starting up")
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-    print("database table created")
-    yield
+    
     print("application shutting down")
 
 
