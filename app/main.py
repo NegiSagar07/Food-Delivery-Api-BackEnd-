@@ -8,7 +8,7 @@ from . import models
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Application starting up")
-    
+    yield
     print("application shutting down")
 
 
