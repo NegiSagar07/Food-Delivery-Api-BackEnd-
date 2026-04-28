@@ -27,4 +27,4 @@ def test_register_user_success_and_fail(client: TestClient):
 
     assert response_duplicate.status_code == HTTPStatus.BAD_REQUEST
 
-    assert response_duplicate.json()["detail"] == "Email already registered"
+    assert response_duplicate.json()["detail"] == "email already exist"

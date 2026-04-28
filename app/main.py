@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from sqlalchemy import engine
+from .database import engine
 from .routers import auth, users, restaurants, foods, orders
 from sqlmodel import SQLModel
 from contextlib import asynccontextmanager

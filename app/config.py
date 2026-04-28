@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     JWT_SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
-    ALGORITHM: str
+    ALGORITHM: str = "HS256"
 
     class Config:
         env_file = ".env"

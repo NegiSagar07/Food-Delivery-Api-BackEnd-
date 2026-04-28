@@ -1,0 +1,715 @@
+==> app/database.py <==
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.orm import declarative_base
+
+from .config import settings
+
+
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    connect_args={"check_same_thread" : False}
+)
+
+SessionLocal = async_sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
+
+Base = declarative_base()
+
+async def get_db():
+    async with SessionLocal() as session:
+        yield session
+==> app/crud.py <==
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from .models import User, Restaurant, Food, RestaurantFoodLink, Order
+from sqlmodel import select
+from typing import Optional, List
+
+
+# ------User Crud------
+
+async def get_user_by_email(email: str, db: AsyncSession) -> Optional[User]:
+    query = select(User).where(User.email == email)
+    user = await db.execute(query)
+    return user.scalars().one_or_none()
+
+
+# ------Restaurant Crud------
+
+async def get_restaurant_by_id(id: int, db: AsyncSession) -> Optional[Restaurant]:
+    """
+    Fetch a single restaurant by its ID.
+    """
+    query = select(Restaurant).where(Restaurant.id == id)
+    result = await db.execute(query)
+    return result.scalars().one_or_none()
+
+
+async def get_restaurant_by_name(name: str, db: AsyncSession) -> Optional[Restaurant]:
+    query = select(Restaurant).where(Restaurant.name == name)
+    restaurant = await db.execute(query)
+    return restaurant.scalars().one_or_none()
+
+
+async def create_restaurant(name: str, rating: Optional[float], owner_id: int, db: AsyncSession) -> Restaurant:
+    new_restaurant = Restaurant(
+        name = name,
+        rating = rating,
+        owner_id = owner_id
+    )
+    db.add(new_restaurant)
+    await db.commit()
+    await db.refresh(new_restaurant)
+
+    return new_restaurant
+
+
+async def get_restaurant(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[Restaurant]:
+    query = select(Restaurant).offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_restaurant_menu(restaurant_id: int, db: AsyncSession) -> List[RestaurantFoodLink]:
+    query = select(RestaurantFoodLink).where(RestaurantFoodLink.restaurant_id == restaurant_id)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+# ------Food Crud------
+
+async def creat_food(name: str, description: Optional[str], db: AsyncSession) -> Food:
+    new_food = Food(name = name, description = description)
+    db.add(new_food)
+    await db.commit()
+    await db.refresh(new_food)
+
+    return new_food
+
+
+async def get_food_by_id(id: int, db:AsyncSession) -> Optional[Food]:
+    query = select(Food).where(Food.id == id)
+    food = await db.execute(query)
+    return food.scalars().one_or_none()
+
+
+async def get_food_by_name(name: str, db: AsyncSession) -> Optional[Food]:
+    query = select(Food).where(Food.name == name)
+    food = await db.execute(query)
+
+    return food.scalars().one_or_none()
+
+
+# ------Menu Crud------
+
+async def add_item_to_menu(restaurant_id: int, food_id: int, price: float, db: AsyncSession) -> RestaurantFoodLink:
+    """
+    Add a food item to a restaurant's menu (creates a RestaurantFoodLink).
+    """
+    new_item = RestaurantFoodLink(
+        restaurant_id=restaurant_id,
+        food_id=food_id,
+        price=price
+    )
+    db.add(new_item)
+    await db.commit()
+    await db.refresh(new_item)
+
+    return new_item
+
+
+async def get_menu_item(restaurant_id: int, food_id, db: AsyncSession) -> Optional[RestaurantFoodLink]:
+    """
+    Check if a specific food item is already on a specific restaurant's menu.
+    """
+    query = select(RestaurantFoodLink).where(RestaurantFoodLink.restaurant_id == restaurant_id, RestaurantFoodLink.food_id == food_id)
+    result = await db.execute(query)
+
+    return result.scalars().one_or_none()
+
+
+#------ Order Crud ------
+
+async def get_order_by_user(user_id: int, db: AsyncSession) -> List[Order]:
+    query = select(Order).where(Order.user_id == user_id).order_by(Order.id.desc())
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_order_by_id(order_id: int, db: AsyncSession) -> Order:
+    query = select(Order).where(Order.id == order_id)
+    result = await db.execute(query)
+    return result.scalars().one_or_none()
+==> app/schemas.py <==
+from sqlmodel import SQLModel, Field
+from typing import List, Annotated, Optional
+from pydantic import EmailStr
+
+
+class UserCreate(SQLModel):
+    name: Annotated[str, Field(min_length=2, max_length=30)]
+    email: EmailStr
+    password: Annotated[str, Field(min_length=4)]
+
+
+class UserRead(SQLModel):
+    id: int
+    name: str
+    email: EmailStr
+
+
+class RestaurantBase(SQLModel):
+    name: str
+    rating: Optional[float] = None
+
+
+class RestaurantCreate(RestaurantBase):
+    pass
+
+
+class RestaurantRead(RestaurantBase):
+    id: int
+    owner: UserRead
+
+
+class FoodBase(SQLModel):
+    name: str
+    description: Optional[str] = None
+
+
+class FoodCreate(FoodBase):
+    pass
+
+
+class FoodRead(FoodBase):
+    id: int
+
+
+# ----------------------------------------------
+# Menu Link Schemas (NEW)
+# ----------------------------------------------
+
+class MenuLinkCreate(SQLModel):
+    food_id: int
+    price: float
+
+
+class MenuLinkRead(SQLModel):
+    restaurant_id: int
+    food_id: int
+    price: float
+    food_rating: Optional[float]
+    food: FoodRead
+
+
+class OrderItemCreate(SQLModel):
+    food_id: int
+    quantity: int
+
+
+class OrderItemRead(SQLModel):
+    id: int
+    food: FoodRead
+    quantity: int
+    price: float
+
+
+class OrderCreate(SQLModel):
+    restaurant_id: int
+    items: List[OrderItemCreate]
+    
+
+class OrderRead(SQLModel):
+    id: int
+    user: UserRead
+    restaurant: RestaurantRead
+    items: List[OrderItemRead]
+    total_price: float
+
+
+class Token(SQLModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(SQLModel):
+    email: Optional[str] = None
+==> app/models.py <==
+from sqlmodel import SQLModel, Field, Relationship
+from typing import Optional, List
+
+
+class RestaurantFoodLink(SQLModel, table=True):
+    __tablename__ = "restaurant_food_links"
+
+    restaurant_id: int = Field(foreign_key="restaurants.id", primary_key=True)
+    food_id: int = Field(foreign_key="foods.id", primary_key=True)
+    price: float
+    food_rating: Optional[float] = Field(default=None)
+
+    food: "Food" = Relationship(back_populates="food_links", sa_relationship_kwargs={"lazy": "joined"})
+    restaurant: "Restaurant" = Relationship(back_populates="restaurant_links", sa_relationship_kwargs={"lazy": "joined"})
+
+
+class User(SQLModel, table=True):
+    __tablename__ = "users"
+
+    id: Optional[int] = Field(default= None, primary_key=True)
+    name: str 
+    email: str = Field(unique=True, index=True)
+    hashed_password: str
+
+    orders: List["Order"] = Relationship(back_populates="user")
+    restaurants: List["Restaurant"] = Relationship(back_populates="owner", sa_relationship_kwargs={"lazy": "selectin"})
+
+
+class Restaurant(SQLModel, table=True):
+    __tablename__ = "restaurants"
+
+    id: Optional[int] = Field(default= None, primary_key=True)
+    name: str = Field(index=True, unique=True)
+    rating: Optional[float] = Field(default= None)
+
+    owner_id: int = Field(foreign_key="users.id")
+    owner: "User" = Relationship(back_populates="restaurants", sa_relationship_kwargs={"lazy": "joined"})
+
+    foods: List["Food"] = Relationship(back_populates="restaurants", link_model=RestaurantFoodLink)
+    orders: List["Order"] = Relationship(back_populates="restaurant")
+    restaurant_links: List["RestaurantFoodLink"] = Relationship(back_populates="restaurant")
+
+
+class Food(SQLModel, table=True):
+    __tablename__ = "foods"
+
+    id: Optional[int] = Field(default= None, primary_key=True)
+    name: str = Field(unique=True, index=True)
+    description: Optional[str] = Field(default=None)
+
+    restaurants: List["Restaurant"] = Relationship(back_populates="foods", link_model=RestaurantFoodLink)
+    order_items: List["OrderItem"] = Relationship(back_populates="food")
+    food_links: List[RestaurantFoodLink] = Relationship(back_populates="food")
+
+
+class Order(SQLModel, table=True):
+    __tablename__= "orders"
+
+    id: Optional[int] = Field(default= None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id")
+    restaurant_id: int = Field(foreign_key="restaurants.id")
+    total_price: float
+
+    user : "User" = Relationship(back_populates="orders", sa_relationship_kwargs={"lazy": "joined"})
+    restaurant: "Restaurant" = Relationship(back_populates="orders", sa_relationship_kwargs={"lazy" : "joined"})
+    items: List["OrderItem"] = Relationship(back_populates="order", sa_relationship_kwargs={"lazy": "selectin"})
+
+
+class OrderItem(SQLModel, table=True):
+    __tablename__ = "order_items"
+
+    id: Optional[int] = Field(default= None, primary_key=True)
+    quantity: int
+    price: float
+    order_id: int = Field(foreign_key="orders.id")
+    food_id: int = Field(foreign_key="foods.id")
+
+    food : "Food" = Relationship(back_populates="order_items", sa_relationship_kwargs={"lazy": "joined"})
+    order: "Order" = Relationship(back_populates="items")
+==> app/__init__.py <==
+
+==> app/main.py <==
+from fastapi import FastAPI
+from sqlalchemy import engine
+from .routers import auth, users, restaurants, foods, orders
+from sqlmodel import SQLModel
+from contextlib import asynccontextmanager
+from . import models
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Application starting up")
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    yield
+    print("application shutting down")
+
+
+app = FastAPI(
+    title="Food Delivery App",
+    description="This is the api for food delivery app.",
+    version="1.0",
+    lifespan=lifespan
+)
+
+
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(restaurants.router)
+app.include_router(foods.router)
+app.include_router(orders.router)
+
+
+@app.get("/")
+async def root():
+    return {"msg" : "Welcome to the Food Delivery Api"}
+==> app/dependencies.py <==
+from fastapi import Depends, status, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+from .database import get_db
+from .models import User
+from .security import get_user_from_token
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> User:
+
+    user = await get_user_from_token(token, db)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid authentication credential",
+            headers={"WWW-Authenticate" : "Bearer"}
+        )
+    return user
+==> app/security.py <==
+from argon2 import PasswordHasher
+from argon2.exceptions import VerificationError, VerifyMismatchError
+from sqlalchemy.ext.asyncio import AsyncSession
+from jose import jwt, JWTError
+from datetime import datetime, timedelta, timezone
+from sqlmodel import select
+from .models import User
+from .config import settings
+from typing import Optional
+
+
+ph = PasswordHasher(
+    time_cost=3, # time waste
+    memory_cost=65536, # expensive gpu
+    parallelism=4, 
+    hash_len=32,
+    salt_len=16
+)
+
+
+def get_password_hash(password):
+    return ph.hash(password)
+
+
+def verify_password(hashed_password, plain_password):
+    try:
+        ph.verify(hashed_password, plain_password)
+        return True
+    except (VerificationError, VerifyMismatchError):
+        return False
+    
+
+def create_access_token(data: dict, expire_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expire_delta:
+        expire = datetime.now(timezone.utc) + expire_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp" : expire})
+
+    token = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.ALGORITHM)
+    return token
+
+
+async def get_user_from_token(token: str, session: AsyncSession):
+    # decode the token
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            return None
+        
+        query = select(User).where(User.email == email)
+        user = await session.execute(query)
+        return user.scalars().first()
+    
+    except JWTError:
+        return None
+==> app/routers/auth.py <==
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from ..schemas import UserCreate, UserRead, Token, TokenData
+from sqlalchemy.ext.asyncio import AsyncSession
+from ..database import get_db
+from ..models import User
+from sqlmodel import select
+from ..security import get_password_hash, verify_password, create_access_token
+
+
+router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+@router.post("/register", response_model=UserRead)
+async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
+    # check if the user already exist
+    query = await db.execute(select(User).where(User.email == user.email))
+    db_user = query.scalars().first()
+    if db_user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email already exist")
+    
+    hashed_password = get_password_hash(user.password)
+
+    new_user = User(
+        name = user.name,
+        email = user.email,
+        hashed_password = hashed_password
+    )
+    
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+
+    return new_user
+
+
+@router.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+
+    query = await db.execute(select(User).where(User.email == form_data.username))
+    user = query.scalars().first()
+
+    if not user or not verify_password(user.hashed_password, form_data.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token = create_access_token(data = {"sub" : user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+==> app/routers/orders.py <==
+from fastapi import APIRouter, Depends, status, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from ..dependencies import get_current_user
+from ..database import get_db
+from ..schemas import OrderCreate, OrderRead
+from ..models import User, OrderItem, Order
+from ..crud import get_restaurant_by_id, get_menu_item, get_order_by_user, get_order_by_id
+from typing import List
+
+
+router = APIRouter(prefix="/order", tags=["Order"])
+
+
+@router.post("/", response_model=OrderRead)
+async def create_new_order(order_in: OrderCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    restaurant = await get_restaurant_by_id(id=order_in.restaurant_id, db=db)
+    if not restaurant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="restaurant not found")
+    
+    total_price = 0.0
+    order_items = []
+
+    for item in order_in.items:
+        menu_item = await get_menu_item(
+            restaurant_id=order_in.restaurant_id,
+            food_id=item.food_id,
+            db=db
+        )
+        if not menu_item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"food item with {item.food_id} not found in this restaurant")
+        
+        item_price = menu_item.price * item.quantity
+        total_price += item_price
+
+        db_item = OrderItem(
+            food_id=item.food_id,
+            quantity=item.quantity,
+            price=menu_item.price
+        )
+
+        order_items.append(db_item)
+    
+    db_order = Order(
+        user_id=current_user.id,
+        restaurant_id=order_in.restaurant_id,
+        total_price=total_price,
+        items=order_items
+    )
+
+    try:
+        db.add(db_order)
+        await db.commit()
+        await db.refresh(db_order)
+
+        return db_order
+        
+    except Exception as e:
+        # If anything fails, roll back
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while creating the order: {e}"
+        )
+    
+
+@router.get("/", response_model=List[OrderRead])
+async def get_my_orders(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    orders = await get_order_by_user(user_id=current_user.id, db=db)
+
+    if not orders:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="you didn't have placed any order yet")
+    
+    return orders
+
+
+@router.get("/{order_id}", response_model=OrderRead)
+async def get_sepecif_order(order_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+
+    order = await get_order_by_id(order_id= order_id, db=db)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
+    
+    if order.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="you are not authorized to view this order")
+    
+    return order
+==> app/routers/__init__.py <==
+
+==> app/routers/foods.py <==
+from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from ..schemas import FoodCreate, FoodRead
+from ..database import get_db
+from ..models import User
+from ..dependencies import get_current_user
+from ..crud import get_food_by_name, creat_food
+
+router = APIRouter(prefix="/foods", tags=["Foods"])
+
+
+@router.post("/", response_model=FoodRead)
+async def create_new_food(food_in: FoodCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+
+    db_food = await get_food_by_name(name=food_in.name, db=db)
+    if db_food:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A Food item with this name already exist")
+    
+    new_food = await creat_food(name=food_in.name, description=food_in.description, db=db)
+
+    return new_food
+==> app/routers/users.py <==
+from fastapi import APIRouter, Depends
+from ..schemas import UserRead
+from ..dependencies import get_current_user
+from ..models import User
+
+
+router = APIRouter(prefix="/users", tags=["Users"])
+
+
+@router.get("/", response_model=UserRead)
+async def get_my_profile(current_user: User = Depends(get_current_user)):
+    return current_user
+
+==> app/routers/restaurants.py <==
+from fastapi import APIRouter, status, Depends, HTTPException
+from ..schemas import RestaurantRead, RestaurantCreate, MenuLinkCreate, MenuLinkRead
+from sqlalchemy.ext.asyncio import AsyncSession
+from ..dependencies import get_current_user
+from ..models import User   
+from ..database import get_db
+from typing import List
+from ..crud import get_restaurant_by_name, create_restaurant, get_restaurant_by_id, get_food_by_id, get_menu_item, add_item_to_menu, get_restaurant, get_restaurant_menu
+
+
+router = APIRouter(prefix="/restaurant", tags=["Restaurant"])
+
+
+@router.post("/", response_model=RestaurantRead, status_code=status.HTTP_201_CREATED)
+async def create_new_restaurant(restaurant: RestaurantCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+
+    db_restaurant = await get_restaurant_by_name(restaurant.name, db)
+    if db_restaurant:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Restaurant name already exist")
+    
+    new_restaurant = await create_restaurant(
+        name = restaurant.name,
+        rating = restaurant.rating,
+        owner_id = current_user.id,
+        db = db
+    )
+
+    return new_restaurant
+
+
+@router.post("/{restaurant_id}/menu", response_model=MenuLinkRead)
+async def add_menu_item_to_restaurant(restaurant_id: int, menu_item: MenuLinkCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    restaurant = await get_restaurant_by_id(restaurant_id, db)
+    if not restaurant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant not found")
+    
+    if restaurant.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No authorize to add item to this restaurant's menu")
+    
+    food = await get_food_by_id(menu_item.food_id, db)
+    if not food:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="food item not found")
+    
+    existing_item = await get_menu_item(restaurant_id=restaurant_id, food_id=menu_item.food_id, db=db)
+    if existing_item:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This item is already in meny")
+    
+    new_menu_item = await add_item_to_menu(
+        restaurant_id=restaurant_id,
+        food_id=menu_item.food_id,
+        price=menu_item.price,
+        db=db
+    )
+
+    return new_menu_item
+
+
+@router.get("/", response_model=List[RestaurantRead])
+async def get_all_restaurant(skip: int = 0, limit:int = 100, db: AsyncSession = Depends(get_db)):
+    restaurants = await get_restaurant(db=db, skip=skip, limit=limit)
+    if not restaurants:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no restaurant available")
+    
+    return restaurants
+
+
+@router.get("/{restaurant_id}/menu", response_model=List[MenuLinkRead])
+async def get_menu_of_restaurant(restaurant_id: int, db: AsyncSession = Depends(get_db)):
+    
+    restaurant = await get_restaurant_by_id(id=restaurant_id, db=db)
+    if not restaurant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found."
+        )
+    
+    menu = await get_restaurant_menu(restaurant_id=restaurant_id, db=db)
+    if not menu:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="menu is not found for this restaurant")
+    
+    return menu
+
+
+
+==> app/config.py <==
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    # Load all environmental veriable from the .env file
+
+    DATABASE_URL: str
+    JWT_SECRET_KEY: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    ALGORITHM: str
+
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
