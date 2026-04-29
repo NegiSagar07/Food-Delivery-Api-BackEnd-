@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     ALGORITHM: str = "HS256"
+    REDIS_URL: str
 
     class Config:
         env_file = ".env"

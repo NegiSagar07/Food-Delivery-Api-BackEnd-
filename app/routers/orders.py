@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.tasks.restaurant import notify_restaurant
 from ..dependencies import get_current_user
 from ..database import get_db
 from ..schemas import OrderCreate, OrderRead
@@ -51,16 +53,26 @@ async def create_new_order(order_in: OrderCreate, current_user: User = Depends(g
         db.add(db_order)
         await db.commit()
         await db.refresh(db_order)
-
-        return db_order
-        
     except Exception as e:
-        # If anything fails, roll back
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred while creating the order: {e}"
+            detail=f"An error occurred while saving the order to database: {e}"
         )
+
+    # Hand off task to Celery
+    try:
+        notify_restaurant.delay(
+            order_id=db_order.id, 
+            restaurant_id=order_in.restaurant_id, 
+            total_price=total_price
+        )
+    except Exception as e:
+        # Log this error! The order was created, but notification failed
+        print(f"Failed to queue notification for order {db_order.id}: {e}")
+        # Return the order anyways because it was successfully paid for / created
+
+    return db_order
     
 
 @router.get("/", response_model=List[OrderRead])

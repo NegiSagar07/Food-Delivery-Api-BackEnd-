@@ -5,7 +5,7 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from sqlmodel import select
 from .models import User
-from .config import settings
+from .core.config import settings
 from typing import Optional
 
 

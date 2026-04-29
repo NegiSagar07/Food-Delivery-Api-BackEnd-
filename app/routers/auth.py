@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+
+from app.tasks.email_tasks import send_welcome_email
 from ..schemas import UserCreate, UserRead, Token, TokenData
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
@@ -29,6 +31,8 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
+
+    send_welcome_email.delay(user_email=new_user.email, user_name=new_user.name)
 
     return new_user
 
